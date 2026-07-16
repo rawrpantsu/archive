@@ -856,6 +856,25 @@ const writeM3u8ToFile = async (m3u8, dir, vodId) => {
 };
 
 const downloadTSFiles = async (m3u8, dir, baseURL) => {
+  // Download init segment for fMP4 HLS
+  const initUri = m3u8.segments[0]?.map?.uri;
+
+  if (initUri && !(await fileExists(`${dir}/${initUri}`))) {
+    await axios({
+      method: 'get',
+      url: `${baseURL}/${initUri}`,
+      responseType: 'stream',
+    })
+      .then((response) => {
+        console.info(`Downloaded ${initUri}`);
+        response.data.pipe(fs.createWriteStream(`${dir}/${initUri}`));
+      })
+      .catch((e) => {
+        console.error(e);
+      });
+  }
+
+  // Download media segments
   for (let segment of m3u8.segments) {
     if (await fileExists(`${dir}/${segment.uri}`)) continue;
 
@@ -874,8 +893,11 @@ const downloadTSFiles = async (m3u8, dir, baseURL) => {
         console.error(e);
       });
   }
+
   if ((process.env.NODE_ENV || '').trim() !== 'production') {
-    console.info(`Done downloading.. Last segment was ${m3u8.segments[m3u8.segments.length - 1].uri}`);
+    console.info(
+      `Done downloading.. Last segment was ${m3u8.segments[m3u8.segments.length - 1].uri}`
+    );
   }
 };
 
